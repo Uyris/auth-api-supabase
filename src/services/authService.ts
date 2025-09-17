@@ -1,93 +1,49 @@
 // src/services/authService.ts
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { supabase } from "../utils/supabaseClient";
-import { sendEmail } from "../utils/sendEmail";
 
-const EXPIRATION_MINUTES = 10;
-
-// Login
+// 🔑 Login
 export const login = async (email: string, password: string) => {
-  const { data: user, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .single();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-  if (error || !user) {
-    throw new Error("Usuário não encontrado");
+  if (error || !data.session) {
+    throw new Error(error?.message || "Falha no login");
   }
 
-  const validPassword = await bcrypt.compare(password, user.password_hash);
-  if (!validPassword) {
-    throw new Error("Email e/ou Senha incorretos.");
-  }
-
-  const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: "1h" }
-  );
-
-  return token;
+  return data.session; // contém access_token (JWT), refresh_token etc.
 };
 
-// Solicitar reset
+// 👤 Criar usuário (apenas admin)
+export const createUserAsAdmin = async (email: string, role: string) => {
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password: Math.random().toString(36).slice(-10), // senha aleatória
+    email_confirm: true,
+    app_metadata: { role },
+  });
+
+  if (error) throw new Error(error.message);
+  return data.user;
+};
+
+// 🔐 Solicitar reset de senha
 export const requestPasswordReset = async (email: string) => {
-  const { data: user } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .single();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "http://localhost:4000/auth/reset-password-callback",
+  });
 
-  if (!user) throw new Error("Usuário não encontrado");
-
-  const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 dígitos
-  const expiresAt = new Date(
-    Date.now() + EXPIRATION_MINUTES * 60 * 1000
-  ).toISOString();
-
-  const { error } = await supabase
-    .from("password_resets")
-    .insert([{ email, code, expires_at: expiresAt }]);
-
-  if (error) throw new Error("Erro ao salvar código de reset");
-
-  await sendEmail(email, code, "reset"); // envia código por email
+  if (error) throw new Error(error.message);
+  return { message: "Email de redefinição enviado" };
 };
 
-// Validar código
-export const verifyResetCode = async (email: string, code: string): Promise<boolean> => {
-  const { data, error } = await supabase
-    .from("password_resets")
-    .select("*")
-    .eq("email", email)
-    .eq("code", code)
-    .eq("used", false)
-    .single();
+// 🔐 Redefinir senha (após clicar no link do email)
+export const resetPassword = async (newPassword: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
 
-  if (error || !data) return false;
-
-  const expired = new Date(data.expires_at) < new Date();
-  return !expired;
-};
-
-// Redefinir senha
-export const resetPassword = async (email: string, newPassword: string) => {
-  const salt = await bcrypt.genSalt(10);
-  const hash = await bcrypt.hash(newPassword, salt);
-
-  const { error: userError } = await supabase
-    .from("users")
-    .update({ password_hash: hash })
-    .eq("email", email);
-
-  if (userError) throw new Error("Erro ao atualizar senha");
-
-  await supabase
-    .from("password_resets")
-    .update({ used: true })
-    .eq("email", email)
-    .order("created_at", { ascending: false })
-    .limit(1);
+  if (error) throw new Error(error.message);
+  return data.user;
 };

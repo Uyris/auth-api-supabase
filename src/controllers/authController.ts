@@ -6,34 +6,30 @@ import * as authService from "../services/authService";
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    const token = await authService.login(email, password);
-    res.json({ token });
+    const session = await authService.login(email, password);
+    res.json(session); // retorna access_token, refresh_token etc.
   } catch (err: any) {
     res.status(401).json({ error: err.message });
   }
 };
 
-// 🔐 Solicitar código de reset
-export const requestPasswordReset = async (req: Request, res: Response) => {
+// 👤 Criar usuário (admin only)
+export const createUser = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
-    await authService.requestPasswordReset(email);
-    res.json({ message: "Código de verificação enviado por email" });
+    const { email, role } = req.body;
+    const user = await authService.createUserAsAdmin(email, role);
+    res.json(user);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// 🔐 Verificar código
-export const verifyResetCode = async (req: Request, res: Response) => {
+// 🔐 Solicitar reset
+export const requestPasswordReset = async (req: Request, res: Response) => {
   try {
-    const { email, code } = req.body;
-    const valid = await authService.verifyResetCode(email, code);
-    if (valid) {
-      res.json({ message: "Código válido, prossiga para redefinir a senha" });
-    } else {
-      res.status(400).json({ error: "Código inválido ou expirado" });
-    }
+    const { email } = req.body;
+    const result = await authService.requestPasswordReset(email);
+    res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -42,9 +38,9 @@ export const verifyResetCode = async (req: Request, res: Response) => {
 // 🔐 Redefinir senha
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    const { email, newPassword } = req.body;
-    await authService.resetPassword(email, newPassword);
-    res.json({ message: "Senha redefinida com sucesso" });
+    const { newPassword } = req.body;
+    const user = await authService.resetPassword(newPassword);
+    res.json({ message: "Senha redefinida com sucesso", user });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
