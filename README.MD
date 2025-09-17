@@ -139,8 +139,7 @@ npm start
 
 ## 🧪 Testes no Postman
 ```
-- AuthAPI.postman_collection.json
-- AuthAPI.postman_environment.json
+- https://restless-star-250798.postman.co/workspace/API-Wes~75014095-b4b3-4451-a49f-1b8260e51c31/request/40017111-f4f4caf9-f3c2-453a-9dc5-7cdb35380a10?action=share&creator=40017111&ctx=documentation&active-environment=40017111-707b6e49-593e-4d5a-95e0-324e7a3ae3b5
 ```
 ---
 
